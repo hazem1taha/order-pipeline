@@ -1,0 +1,93 @@
+flowchart TB
+    subgraph client["Client"]
+        HTTP([HTTP POST /orders])
+    end
+
+    subgraph apigw["API Gateway"]
+        RESTAPI["REST API"]
+    end
+
+    subgraph ingest["Ingestion Lambda"]
+        ING["order-ingest"]
+        IDEM["Idempotency check\n(GI2 lookup)"]
+        WRITE["Conditional write\nDynamoDB"]
+        PUB_R["Publish:\norder.received"]
+    end
+
+    subgraph bus["EventBridge Bus\norders-bus-{stage}"]
+        RULE_R["order.received\n→ validation queue"]
+        RULE_V["order.validated\n→ enrichment queue"]
+        RULE_E["order.enriched\n→ completion queue"]
+        RULE_F["order.failed\n→ completion queue"]
+    end
+
+    subgraph queues["SQS Queues"]
+        VAL_Q["order-validation-queue"]
+        ENR_Q["order-enrichment-queue"]
+        COMP_Q["order-completion-queue"]
+        VAL_DLQ["order-validation-dlq"]
+        ENR_DLQ["order-enrichment-dlq"]
+        COMP_DLQ["order-completion-dlq"]
+    end
+
+    subgraph validators["Validation Lambda"]
+        VAL["order-validation"]
+        BR["Business rules:\nemail, qty, price"]
+    end
+
+    subgraph enrichers["Enrichment Lambda"]
+        ENR["order-enrichment"]
+        MOCK["Mock product\nlookup"]
+    end
+
+    subgraph completers["Completion Lambda"]
+        COMP["order-completion"]
+    end
+
+    subgraph query["Query Lambda"]
+        QRY["order-query\nHTTP GET /orders/{orderId}"]
+    end
+
+    subgraph ddb["DynamoDB\norders-{stage}"]
+        TABLE["Single Table\nPK=TENANT#\nSK=ORDER#\nGSI1: status\nGSI2: idempotency"]
+    end
+
+    HTTP --> RESTAPI --> ING
+    ING --> IDEM
+    IDEM --> WRITE
+    WRITE --> TABLE
+    WRITE --> PUB_R
+    PUB_R --> RULE_R
+    RULE_R --> VAL_Q
+    VAL_Q --> VAL
+    VAL --> BR
+    BR -->|valid| WRITE_D["Update:\nstatus=validated"]
+    BR -->|invalid| FAIL_D["Update:\nstatus=failed"]
+    WRITE_D --> TABLE
+    FAIL_D --> TABLE
+    VAL -->|Publish: order.validated| RULE_V
+    VAL -->|Publish: order.failed| RULE_F
+    RULE_V --> ENR_Q
+    RULE_F --> COMP_Q
+    ENR_Q --> ENR
+    ENR --> MOCK
+    MOCK --> WRITE_E["Update:\nstatus=enriched\n+ enriched items"]
+    WRITE_E --> TABLE
+    ENR -->|Publish: order.enriched| RULE_E
+    RULE_E --> COMP_Q
+    COMP_Q --> COMP
+    COMP --> WRITE_C["Update:\nstatus=completed"]
+    WRITE_C --> TABLE
+    COMP -->|Publish: order.completed| DONE[".completed event"]
+    QRY -->|Read| TABLE
+
+    VAL_Q -.DLQ.-> VAL_DLQ
+    ENR_Q -.DLQ.-> ENR_DLQ
+    COMP_Q -.DLQ.-> COMP_DLQ
+
+    style ING fill:#1e40af,color:#fff
+    style VAL fill:#065f46,color:#fff
+    style ENR fill:#7c3aed,color:#fff
+    style COMP fill:#1e40af,color:#fff
+    style QRY fill:#1e40af,color:#fff
+    style TABLE fill:#7f1d1d,color:#fff

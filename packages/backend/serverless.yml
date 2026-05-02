@@ -1,0 +1,302 @@
+service: order-pipeline
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: ${opt:stage, 'local'}
+  region: ${opt:region, 'eu-west-1'}
+  architecture: arm64
+  memorySize: 256
+  timeout: 30
+  environment:
+    AWS_REGION: ${self:provider.region}
+    STAGE: ${self:provider.stage}
+    DYNAMODB_TABLE_NAME: ${self:custom.tableName}
+    EVENT_BUS_NAME: ${self:custom.busName}
+    LOCALSTACK_URL: ${self:custom.localstackUrl}
+    IDEMPOTENCY_WINDOW_DAYS: '30'
+    ENVIRONMENT: ${self:provider.stage}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:Query
+          Resource: !GetAtt OrdersTable.Arn
+          Condition:
+            StringEquals:
+              dynamodb:Attr:pk:
+                - !Sub 'TENANT#${.dynamodb.tenantId}'
+        - Effect: Allow
+          Action:
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            - sqs:GetQueueUrl
+          Resource: !GetAtt OrderValidationQueue.Arn
+        - Effect: Allow
+          Action:
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            - sqs:GetQueueUrl
+          Resource: !GetAtt OrderEnrichmentQueue.Arn
+        - Effect: Allow
+          Action:
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            - sqs:GetQueueUrl
+          Resource: !GetAtt OrderCompletionQueue.Arn
+        - Effect: Allow
+          Action:
+            - events:PutEvents
+          Resource: !GetAtt OrdersBus.Arn
+        - Effect: Allow
+          Action:
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            - sqs:GetQueueUrl
+          Resource: !GetAtt ValidationDLQ.Arn
+        - Effect: Allow
+          Action:
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            - sqs:GetQueueUrl
+          Resource: !GetAtt EnrichmentDLQ.Arn
+        - Effect: Allow
+          Action:
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            - sqs:GetQueueUrl
+          Resource: !GetAtt CompletionDLQ.Arn
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: '*'
+
+plugins:
+  - serverless-esbuild
+
+custom:
+  tableName: orders-${self:provider.stage}
+  busName: orders-bus-${self:provider.stage}
+  localstackUrl: ${env:LOCALSTACK_URL, ''}
+  esbuild:
+    bundle: true
+    minify: true
+    sourcemap: true
+    exclude:
+      - aws-sdk
+    target: node20
+    platform: node
+    concurrency: 10
+
+functions:
+  order-ingest:
+    handler: src/handlers/ingest.ingestHandler
+    events:
+      - http:
+          path: /orders
+          method: post
+    memorySize: 256
+    timeout: 10
+
+  order-query:
+    handler: src/handlers/query.queryHandler
+    events:
+      - http:
+          path: /orders/{orderId}
+          method: get
+
+  order-validation:
+    handler: src/handlers/validate.validateHandler
+    events:
+      - sqs:
+          arn: !GetAtt OrderValidationQueue.Arn
+          batchSize: 1
+
+  order-enrichment:
+    handler: src/handlers/enrich.enrichHandler
+    events:
+      - sqs:
+          arn: !GetAtt OrderEnrichmentQueue.Arn
+          batchSize: 1
+
+  order-completion:
+    handler: src/handlers/complete.completeHandler
+    events:
+      - sqs:
+          arn: !GetAtt OrderCompletionQueue.Arn
+          batchSize: 1
+
+  order-dlq-monitor:
+    handler: src/handlers/dlq-monitor.dlqMonitorHandler
+    events:
+      - schedule: rate(5 minutes)
+
+resources:
+  Resources:
+    OrdersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.tableName}
+        BillingMode: PAY_PER_REQUEST
+        PointInTimeRecoveryEnabled: true
+        AttributeDefinitions:
+          - AttributeName: pk
+            AttributeType: S
+          - AttributeName: sk
+            AttributeType: S
+          - AttributeName: gsi1pk
+            AttributeType: S
+          - AttributeName: gsi1sk
+            AttributeType: S
+          - AttributeName: gsi2pk
+            AttributeType: S
+          - AttributeName: gsi2sk
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pk
+            KeyType: HASH
+          - AttributeName: sk
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: GSI1
+            KeySchema:
+              - AttributeName: gsi1pk
+                KeyType: HASH
+              - AttributeName: gsi1sk
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: GSI2
+            KeySchema:
+              - AttributeName: gsi2pk
+                KeyType: HASH
+              - AttributeName: gsi2sk
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+    OrdersBus:
+      Type: AWS::Events::EventBus
+      Properties:
+        Name: ${self:custom.busName}
+
+    OrderValidationQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: order-validation-queue
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt ValidationDLQ.Arn
+          visibilityTimeout: 60
+        MessageRetentionPeriod: 1209600
+
+    ValidationDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: order-validation-dlq
+        MessageRetentionPeriod: 1209600
+
+    OrderEnrichmentQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: order-enrichment-queue
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt EnrichmentDLQ.Arn
+          visibilityTimeout: 60
+        MessageRetentionPeriod: 1209600
+
+    EnrichmentDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: order-enrichment-dlq
+        MessageRetentionPeriod: 1209600
+
+    OrderCompletionQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: order-completion-queue
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt CompletionDLQ.Arn
+          visibilityTimeout: 60
+        MessageRetentionPeriod: 1209600
+
+    CompletionDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: order-completion-dlq
+        MessageRetentionPeriod: 1209600
+
+    OrderReceivedRule:
+      Type: AWS::Events::Rule
+      Properties:
+        EventBusName: !Ref OrdersBus
+        EventPattern:
+          source:
+            - order-pipeline
+          'detail-type':
+            - order.received
+        Targets:
+          - Id: order-validation-queue
+            Arn: !GetAtt OrderValidationQueue.Arn
+
+    OrderValidatedRule:
+      Type: AWS::Events::Rule
+      Properties:
+        EventBusName: !Ref OrdersBus
+        EventPattern:
+          source:
+            - order-pipeline
+          'detail-type':
+            - order.validated
+        Targets:
+          - Id: order-enrichment-queue
+            Arn: !GetAtt OrderEnrichmentQueue.Arn
+
+    OrderEnrichedRule:
+      Type: AWS::Events::Rule
+      Properties:
+        EventBusName: !Ref OrdersBus
+        EventPattern:
+          source:
+            - order-pipeline
+          'detail-type':
+            - order.enriched
+        Targets:
+          - Id: order-completion-queue
+            Arn: !GetAtt OrderCompletionQueue.Arn
+
+    OrderFailedRule:
+      Type: AWS::Events::Rule
+      Properties:
+        EventBusName: !Ref OrdersBus
+        EventPattern:
+          source:
+            - order-pipeline
+          'detail-type':
+            - order.failed
+        Targets:
+          - Id: order-completion-queue
+            Arn: !GetAtt OrderCompletionQueue.Arn
+
+    DLQAlarm:
+      Type: AWS::CloudWatch::CompositeAlarm
+      Properties:
+        AlarmName: ${self:service}-dlq-alarm
+        AlarmDescription: 'Fires when any DLQ has messages'
+        AlarmRule: !Join
+          - OR
+          - - !Ref ValidationDLQ
+            - !Ref EnrichmentDLQ
+            - !Ref CompletionDLQ
+
+outputs:
+  ApiEndpoint:
+    Description: 'API Gateway endpoint URL'
+    Value: !Sub 'https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${self:provider.stage}'
