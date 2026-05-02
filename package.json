@@ -1,0 +1,19 @@
+{
+  "name": "serverless-order-pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Event-driven order ingestion pipeline on AWS serverless",
+  "scripts": {
+    "dev:up": "docker-compose up -d && ./scripts/localstack-up.sh && pnpm -r build && pnpm --filter frontend dev &",
+    "dev:down": "docker-compose down",
+    "deploy": "pnpm --filter backend deploy",
+    "remove": "pnpm --filter backend remove",
+    "build": "pnpm -r build",
+    "test:unit": "pnpm -r --filter backend test:unit",
+    "test:integration": "docker-compose up -d && ./scripts/seed-localstack.sh && sleep 5 && pnpm --filter backend test:integration",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "keywords": ["aws", "serverless", "event-driven", "order-pipeline", "typescript"],
+  "license": "MIT"
+}

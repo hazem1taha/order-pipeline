@@ -1,0 +1,40 @@
+sequenceDiagram
+    participant C as Client
+    participant API as API Gateway
+    participant ING as Ingestion Lambda
+    participant DDB as DynamoDB
+    participant EB as EventBridge
+    participant VAL as Validation Lambda
+    participant ENR as Enrichment Lambda
+    participant COMP as Completion Lambda
+
+    Note over C,COMP: Synchronous path
+    C->>API: POST /orders {tenantId, customer, items, idempotencyKey}
+    API->>ING: Lambda invoke (sync)
+    ING->>DDB: Query GSI2: idempotencyKey exists?
+    DDB-->>ING: null (new order)
+    ING->>DDB: PutItem (status='received', ConditionalExpression: pk NOT EXISTS)
+    ING->>EB: PutEvents: order.received
+    ING-->>API: 201 {order}
+    API-->>C: 200 OK (~100ms)
+
+    Note over C,COMP: Asynchronous processing
+    EB->>VAL: SQS trigger: order.received event
+    VAL->>DDB: GetItem: order
+    VAL->>DDB: UpdateItem: status='validated'
+    VAL->>EB: PutEvents: order.validated
+    VAL-->>EB: done
+
+    EB->>ENR: SQS trigger: order.validated event
+    ENR->>DDB: GetItem: order
+    ENR->>DDB: UpdateItem: status='enriched' + enriched lineItems
+    ENR->>EB: PutEvents: order.enriched
+    ENR-->>EB: done
+
+    EB->>COMP: SQS trigger: order.enriched event
+    COMP->>DDB: GetItem: order
+    COMP->>DDB: UpdateItem: status='completed'
+    COMP->>EB: PutEvents: order.completed
+    COMP-->>EB: done
+
+    Note over C,COMP: Full round-trip typically < 10 seconds
