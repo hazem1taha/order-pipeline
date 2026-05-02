@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   localstack:
-    image: localstack/localstack-community:latest
+    image: localstack/localstack:latest
     ports:
       - "4566:4566"
     environment:
