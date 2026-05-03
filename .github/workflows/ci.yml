@@ -11,6 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v3
+        with:
+          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -29,11 +31,13 @@ jobs:
         ports:
           - 4566:4566
         env:
-          SERVICES: dynamodb,sqs,eventbridge,lambda,iam,cloudwatchlogs
+          SERVICES: dynamodb,sqs,events,lambda,iam,cloudwatchlogs
           START_WARM: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v3
+        with:
+          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -48,6 +52,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v3
+        with:
+          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: '20'

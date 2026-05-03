@@ -50,19 +50,24 @@ I built this as a reference implementation of the patterns I use in production f
 
 ## Quick start
 
+**Prerequisites:** Docker, Node.js 20+, pnpm
+
 ```bash
 git clone git@github.com:hazem1taha/order-pipeline.git
 cd order-pipeline
+cp .env.example .env          # add LOCALSTACK_AUTH_TOKEN if you have one
+docker compose up --build     # starts LocalStack + backend (seeds infra automatically)
 pnpm install
-./scripts/localstack-up.sh
-./scripts/seed-localstack.sh
-pnpm --filter frontend dev
-# Visit http://localhost:5173
+pnpm --filter frontend dev    # visit http://localhost:5173
 ```
+
+The backend API is available at `http://localhost:3000/local/orders`.
+
+Code changes under `packages/backend/src/` are picked up on the next request — no restart needed.
 
 Teardown:
 ```bash
-./scripts/localstack-down.sh
+docker compose down
 ```
 
 ---
@@ -132,7 +137,7 @@ If you're evaluating this for production use, these are the first five things I'
 | Layer | Technology |
 |---|---|
 | Backend | Node.js 20.x, TypeScript 5 (strict), AWS SDK v3 (modular) |
-| IaC | Serverless Framework v3 |
+| IaC | Serverless Framework v3 + serverless-offline |
 | Database | DynamoDB (single-table, on-demand) |
 | Messaging | EventBridge (custom bus) + SQS (with DLQs) |
 | Frontend | React 18, Vite, TanStack Query, Tailwind CSS, Zod |
@@ -149,7 +154,8 @@ serverless-order-pipeline/
 ├── ARCHITECTURE.md
 ├── LICENSE
 ├── CHANGELOG.md
-├── docker-compose.yml
+├── Dockerfile                  # backend dev image (node + serverless-offline)
+├── docker-compose.yml          # LocalStack + backend
 ├── .env.example
 ├── packages/
 │   ├── backend/
@@ -182,9 +188,10 @@ serverless-order-pipeline/
 │       │   └── components/
 │       └── package.json
 ├── scripts/
+│   ├── docker-entrypoint.sh    # seeds LocalStack then starts serverless-offline
+│   ├── seed-localstack.sh      # creates DynamoDB table, SQS queues, EventBridge rules
 │   ├── localstack-up.sh
-│   ├── localstack-down.sh
-│   └── seed-localstack.sh
+│   └── localstack-down.sh
 └── .github/workflows/ci.yml
 ```
 
@@ -196,8 +203,8 @@ serverless-order-pipeline/
 # Unit tests (< 5 seconds)
 pnpm -r test:unit
 
-# Integration tests (requires LocalStack)
-docker-compose up -d && ./scripts/seed-localstack.sh
+# Integration tests (requires LocalStack running)
+docker compose up -d
 pnpm -r test:integration
 ```
 
