@@ -2,26 +2,25 @@ import type { APIGatewayProxyResult, SQSEvent } from 'aws-lambda';
 import { DynamoDBOrdersRepository } from '../infra/orders-repository.js';
 import { EventBridgePublisher } from '../infra/event-publisher.js';
 import { createLogger } from '../infra/logger.js';
-import { createOrder, type Order } from '../domain/order.js';
+import { createOrder } from '../domain/order.js';
 import {
   createOrderReceivedEvent,
   createOrderValidatedEvent,
   createOrderFailedEvent,
   ORDER_RECEIVED,
 } from '../domain/events.js';
-import { validateOrderForIngestion, validateBusinessRules } from '../domain/validation.js';
+import { validateBusinessRules } from '../domain/validation.js';
 import {
   withLambdaHandler,
   createAPIGatewayResponse,
   parseJSON,
 } from '../lib/middleware.js';
+import { z as Zod } from 'zod';
 import { OrderValidationError } from '../lib/errors.js';
 
 const logger = createLogger();
 const repo = new DynamoDBOrdersRepository();
 const publisher = new EventBridgePublisher();
-
-const Zod = await import('zod').then((m) => m.z);
 
 const IngestSchema = Zod.object({
   tenantId: Zod.string().min(1),
@@ -30,7 +29,7 @@ const IngestSchema = Zod.object({
     customerId: Zod.string().min(1),
     email: Zod.string().email(),
   }),
-  items: Zod.array(
+  lineItems: Zod.array(
     Zod.object({
       productId: Zod.string().min(1),
       quantity: Zod.number().int().positive(),
@@ -42,7 +41,7 @@ const IngestSchema = Zod.object({
 
 async function handleIngest(
   event: { body: string | null },
-  ctx: { requestId: string },
+  _ctx: { requestId: string },
 ): Promise<APIGatewayProxyResult> {
   const body = parseJSON(event.body);
   const parseResult = IngestSchema.safeParse(body);
@@ -66,8 +65,8 @@ async function handleIngest(
     tenantId: input.tenantId,
     idempotencyKey: input.idempotencyKey,
     customer: input.customer,
-    lineItems: input.items,
-    metadata: input.metadata,
+    lineItems: input.lineItems,
+    ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
   });
 
   // Conditional write (prevent race-condition duplicates)
@@ -89,7 +88,7 @@ async function handleIngest(
 
 async function handleValidate(
   event: SQSEvent,
-  ctx: { requestId: string },
+  _ctx: { requestId: string },
 ): Promise<void> {
   for (const record of event.Records) {
     const raw = JSON.parse(record.body);

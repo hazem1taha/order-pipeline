@@ -70,7 +70,7 @@ export function createOrder(input: {
     idempotencyKey: input.idempotencyKey,
     createdAt: now,
     updatedAt: now,
-    metadata: input.metadata,
+    metadata: input.metadata ?? {},
   };
 }
 

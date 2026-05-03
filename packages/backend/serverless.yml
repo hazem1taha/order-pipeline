@@ -1,6 +1,6 @@
 service: order-pipeline
 
-frameworkVersion: '4'
+frameworkVersion: '3'
 
 provider:
   name: aws
@@ -81,6 +81,7 @@ provider:
 
 plugins:
   - serverless-esbuild
+  - serverless-offline
 
 custom:
   tableName: orders-${self:provider.stage}
