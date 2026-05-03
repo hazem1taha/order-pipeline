@@ -1,5 +1,5 @@
 export class OrderNotFoundError extends Error {
-  readonly name = 'OrderNotFoundError';
+  override readonly name = 'OrderNotFoundError';
   readonly statusCode = 404;
   constructor(orderId: string) {
     super(`Order ${orderId} not found`);
@@ -10,7 +10,7 @@ export class OrderNotFoundError extends Error {
 }
 
 export class OrderValidationError extends Error {
-  readonly name = 'OrderValidationError';
+  override readonly name = 'OrderValidationError';
   readonly statusCode = 400;
   readonly errors: string[];
   constructor(errors: string[]) {
@@ -23,7 +23,7 @@ export class OrderValidationError extends Error {
 }
 
 export class IdempotencyConflictError extends Error {
-  readonly name = 'IdempotencyConflictError';
+  override readonly name = 'IdempotencyConflictError';
   readonly statusCode = 409;
   readonly existingOrder: unknown;
   constructor(existingOrder: unknown) {
@@ -36,7 +36,7 @@ export class IdempotencyConflictError extends Error {
 }
 
 export class TransientError extends Error {
-  readonly name = 'TransientError';
+  override readonly name = 'TransientError';
   readonly statusCode = 500;
   constructor(message: string) {
     super(message);
@@ -47,7 +47,7 @@ export class TransientError extends Error {
 }
 
 export class InfrastructureError extends Error {
-  readonly name = 'InfrastructureError';
+  override readonly name = 'InfrastructureError';
   readonly statusCode = 500;
   constructor(message: string) {
     super(message);

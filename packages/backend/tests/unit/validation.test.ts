@@ -1,5 +1,5 @@
 import { validateOrderForIngestion, validateBusinessRules } from '../../src/domain/validation';
-import { createOrder, OrderStatus } from '../../src/domain/order';
+import { createOrder } from '../../src/domain/order';
 
 describe('validateOrderForIngestion', () => {
   const validInput = {

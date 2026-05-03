@@ -1,4 +1,4 @@
-import { createOrder, updateOrderStatus, InvalidStatusTransitionError, OrderStatus } from '../src/domain/order';
+import { createOrder, updateOrderStatus, InvalidStatusTransitionError, OrderStatus } from '../../src/domain/order';
 
 describe('createOrder', () => {
   it('generates a UUID and sets RECEIVED status', () => {
