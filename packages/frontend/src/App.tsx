@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { OrderForm } from './components/OrderForm';
 import { OrderList } from './components/OrderList';
-import { type Order, api } from './api/client';
+import { api } from './api/client';
 
 const queryClient = new QueryClient();
 
@@ -37,7 +37,6 @@ function OrderListWithPolling({ tenantId }: { tenantId: string }) {
 function AppContent() {
   const [tenantId, setTenantId] = useState('tenant-123');
   const [activeTab, setActiveTab] = useState<'submit' | 'orders'>('submit');
-  const [lastOrder, setLastOrder] = useState<Order | null>(null);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-6">
@@ -63,8 +62,7 @@ function AppContent() {
 
         <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
           {activeTab === 'submit' ? (
-            <OrderForm tenantId={tenantId} onSuccess={(order) => {
-              setLastOrder(order);
+            <OrderForm tenantId={tenantId} onSuccess={() => {
               setActiveTab('orders');
             }} />
           ) : (

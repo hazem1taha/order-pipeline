@@ -1,5 +1,3 @@
-import { useState } from 'react';
-
 const API_BASE = 'http://localhost:3000/local/orders';
 
 export interface Customer {

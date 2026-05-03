@@ -7,8 +7,6 @@ interface Props {
   onClose: () => void;
 }
 
-const TIMELINE_STATUSES = ['received', 'validated', 'enriched', 'completed', 'failed'];
-
 export function OrderDetail({ order, onClose }: Props) {
   const [showRaw, setShowRaw] = useState(false);
   const timestamps = [
