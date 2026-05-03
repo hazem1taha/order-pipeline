@@ -1,5 +1,5 @@
 import type { APIGatewayProxyResult } from 'aws-lambda';
-import { createLogger, type Logger } from '../infra/logger.js';
+import { createLogger } from '../infra/logger.js';
 import { OrderValidationError } from './errors.js';
 
 export interface LambdaContext {

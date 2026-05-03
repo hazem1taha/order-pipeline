@@ -1,4 +1,3 @@
-import type { SQSEvent } from 'aws-lambda';
 import {
   SQSClient,
   ReceiveMessageCommand,
@@ -21,7 +20,7 @@ async function inspectDLQ(queueName: string, sqsClient: SQSClient): Promise<void
   const result = await sqsClient.send(
     new ReceiveMessageCommand({
       QueueUrl: queueUrl,
-      MaxMessages: 10,
+      MaxNumberOfMessages: 10,
       WaitTimeSeconds: 5,
     }),
   );
@@ -64,7 +63,7 @@ async function inspectDLQ(queueName: string, sqsClient: SQSClient): Promise<void
 async function handleDLQMonitor(): Promise<void> {
   const sqsClient = new SQSClient({
     region: config.AWS_REGION,
-    endpoint: config.LOCALSTACK_URL,
+    ...(config.LOCALSTACK_URL ? { endpoint: config.LOCALSTACK_URL } : {}),
   });
 
   for (const dlqName of DLQ_NAMES) {

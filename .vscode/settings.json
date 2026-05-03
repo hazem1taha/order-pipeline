@@ -1,0 +1,10 @@
+{
+  "eslint.validate": ["typescript", "typescriptreact"],
+  "eslint.workingDirectories": [
+    { "dir": "packages/backend", "changeProcessCWD": true },
+    { "dir": "packages/frontend", "changeProcessCWD": true }
+  ],
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  }
+}

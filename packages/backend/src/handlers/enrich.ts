@@ -4,9 +4,7 @@ import { EventBridgePublisher } from '../infra/event-publisher.js';
 import { createLogger } from '../infra/logger.js';
 import {
   createOrderEnrichedEvent,
-  createOrderFailedEvent,
   ORDER_ENRICHED,
-  ORDER_FAILED,
 } from '../domain/events.js';
 import { withLambdaHandler } from '../lib/middleware.js';
 

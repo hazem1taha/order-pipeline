@@ -1,11 +1,9 @@
 import type { APIGatewayProxyResult, APIGatewayProxyEvent } from 'aws-lambda';
 import { DynamoDBOrdersRepository } from '../infra/orders-repository.js';
-import { createLogger } from '../infra/logger.js';
 import { createAPIGatewayResponse } from '../lib/middleware.js';
 import { OrderNotFoundError } from '../lib/errors.js';
 import { withLambdaHandler } from '../lib/middleware.js';
 
-const logger = createLogger();
 const repo = new DynamoDBOrdersRepository();
 
 async function handleQuery(

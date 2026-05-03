@@ -1,7 +1,5 @@
 import {
   DynamoDBClient,
-  CreateTableCommand,
-  CreateTableCommandInput,
 } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient,
@@ -11,7 +9,7 @@ import {
   QueryCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { config } from '../config.js';
-import type { Order, LineItem, Customer } from '../domain/order.js';
+import type { Order } from '../domain/order.js';
 
 export interface OrdersRepository {
   put(order: Order): Promise<void>;
